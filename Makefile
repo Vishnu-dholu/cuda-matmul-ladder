@@ -1,4 +1,3 @@
-cat > Makefile << 'EOF'
 # Makefile for cuda-matmul-ladder
 .RECIPEPREFIX := >
 ARCH    ?= sm_75
@@ -19,4 +18,3 @@ build:
 
 clean:
 > rm -rf build
-EOF
