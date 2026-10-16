@@ -1,7 +1,8 @@
 // main.cu: benchmark harness.
-// Usage: ./build/matmul N [reps] [--csv]
-//   default : readable table in the terminal
-//   --csv   : machine-readable CSV on stdout (used by scripts/run_bench.py)
+// Usage: ./build/matmul N [reps] [--csv] [--only KERNEL]
+//   default        : readable table in the terminal
+//   --csv          : machine-readable CSV on stdout (used by scripts/run_bench.py)
+//   --only KERNEL  : run just one kernel (plus cuBLAS), handy for profiling
 #include <unistd.h>
 
 #include <cstdio>
@@ -14,7 +15,7 @@
 #include "kernels/v1_naive.cuh"
 #include "kernels/v2_coalesced.cuh"
 #include "kernels/v3_tiled.cuh"
-// Step 6: #include "kernels/v4_regtiled.cuh"
+#include "kernels/v4_regtiled.cuh"
 
 struct Result {
     std::string name;
@@ -54,10 +55,11 @@ static void print_table(const std::vector<Result>& res, int N, int reps, const c
     const char* red = color ? "\033[31m" : "";
     const char* reset = color ? "\033[0m" : "";
 
-    double base = res.front().gflops;  // first row = v1_naive
-    double ceiling = 0.0;              // cuBLAS result
-    for (const auto& r : res)
+    double base = 0.0, ceiling = 0.0;  // v1_naive and cuBLAS results, if present
+    for (const auto& r : res) {
+        if (r.name == "v1_naive") base = r.gflops;
         if (r.name == "cublas") ceiling = r.gflops;
+    }
 
     printf("\n%sGPU:%s %s   %sN:%s %d   %sreps:%s %d\n\n", bold, reset, gpu, bold, reset, N, bold,
            reset, reps);
@@ -68,29 +70,39 @@ static void print_table(const std::vector<Result>& res, int N, int reps, const c
         double pct = ceiling > 0.0 ? 100.0 * r.gflops / ceiling : 0.0;
         int bar = (int)(pct / 5.0 + 0.5);  // 20 characters = 100%
         if (bar > 20) bar = 20;
-        printf("  %-14s %11.3f %10.1f %8.1fx %9.1f%%  %s%-5s%s  %s\n", r.name.c_str(), r.ms,
-               r.gflops, r.gflops / base, pct, r.ok ? green : red, r.ok ? "PASS" : "FAIL", reset,
+        char vs[32];
+        if (base > 0.0)
+            snprintf(vs, sizeof vs, "%.1fx", r.gflops / base);
+        else
+            snprintf(vs, sizeof vs, "-");
+        printf("  %-14s %11.3f %10.1f %9s %9.1f%%  %s%-5s%s  %s\n", r.name.c_str(), r.ms, r.gflops,
+               vs, pct, r.ok ? green : red, r.ok ? "PASS" : "FAIL", reset,
                std::string(bar, '#').c_str());
     }
     printf("\n");
 }
 
 int main(int argc, char** argv) {
-    // ---- arguments: two optional numbers (N, reps) and an optional --csv flag ----
+    // ---- arguments: N and reps (optional numbers), --csv, --only KERNEL ----
     bool csv = false;
+    std::string only;
     std::vector<int> nums;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--csv")
             csv = true;
+        else if (a == "--only" && i + 1 < argc)
+            only = argv[++i];
         else
             nums.push_back(atoi(argv[i]));
     }
     const int N = nums.size() > 0 ? nums[0] : 1024;
     const int reps = nums.size() > 1 ? nums[1] : 10;
     if (N <= 0 || N % 128 != 0 || reps <= 0) {
-        fprintf(stderr, "usage: %s N [reps] [--csv]   (N must be a positive multiple of 128)\n",
-                argv[0]);
+        fprintf(
+            stderr,
+            "usage: %s N [reps] [--csv] [--only KERNEL]   (N must be a positive multiple of 128)\n",
+            argv[0]);
         return 1;
     }
     const bool color = !csv && isatty(STDOUT_FILENO);  // colors only in a real terminal
@@ -136,11 +148,15 @@ int main(int argc, char** argv) {
                 check(hCpu.data(), hRef.data(), count) ? "OK" : "FAILED");
     }
 
-    // 5) the kernels to benchmark (v1_naive must stay first: it is the "vs v1" baseline)
+    // 5) the kernels to benchmark
     dim3 block32(32, 32);
     dim3 grid32((N + 31) / 32, (N + 31) / 32);
     dim3 block16(16, 16);
     dim3 grid16((N + 15) / 16, (N + 15) / 16);
+    dim3 blockR64((64 * 64) / (4 * 4));  // 256 threads, each computes 4x4 outputs
+    dim3 gridR64(N / 64, N / 64);
+    dim3 blockR128((128 * 128) / (8 * 8));  // 256 threads, each computes 8x8 outputs
+    dim3 gridR128(N / 128, N / 128);
 
     struct Version {
         const char* name;
@@ -151,9 +167,24 @@ int main(int argc, char** argv) {
         {"v2_coalesced", [&] { matmul_coalesced<<<grid32, block32>>>(dA, dB, dC, N); }},
         {"v3_tiled_t16", [&] { matmul_tiled<16><<<grid16, block16>>>(dA, dB, dC, N); }},
         {"v3_tiled_t32", [&] { matmul_tiled<32><<<grid32, block32>>>(dA, dB, dC, N); }},
-        // Step 6: add the v4_regtiled line here
+        {"v4_reg_64",
+         [&] { matmul_regtiled<64, 64, 8, 4, 4><<<gridR64, blockR64>>>(dA, dB, dC, N); }},
+        {"v4_reg_128",
+         [&] { matmul_regtiled<128, 128, 8, 8, 8><<<gridR128, blockR128>>>(dA, dB, dC, N); }},
         {"cublas", run_cublas},
     };
+
+    // --only KERNEL: keep that kernel (plus cuBLAS for the % column)
+    if (!only.empty()) {
+        std::vector<Version> keep;
+        for (auto& v : versions)
+            if (only == v.name || std::string(v.name) == "cublas") keep.push_back(v);
+        if (keep.size() == 1 && only != "cublas") {
+            fprintf(stderr, "unknown kernel '%s'\n", only.c_str());
+            return 1;
+        }
+        versions = keep;
+    }
 
     // 6) verify and time every kernel, collect the results
     std::vector<Result> results;
