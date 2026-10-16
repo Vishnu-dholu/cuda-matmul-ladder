@@ -136,7 +136,7 @@ The 128 tile has higher data reuse but fewer, bigger blocks. Its 123 registers p
 
 The GPU ideas (coalescing, tiling) are locality ideas. I reproduced them on the CPU.
 
-**Measured on `<<FILL: CPU model, from: lscpu | grep "Model name">>`:**
+**Measured on `Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz`:**
 
 - Walking a 4096x4096 int matrix column by column was **6.9x slower** than row by row (27.7 ms vs 4.0 ms).
 - Visiting every element at stride 1 costs 0.40 ns per element. At stride 16 ints (one 64-byte line) it costs 2.81 ns, and from stride 64 on it plateaus at 5.3-6.3 ns, which is 13-16x the stride-1 cost. Only 1 of 16 ints in each fetched line is useful, so the cost approaches 16x.
