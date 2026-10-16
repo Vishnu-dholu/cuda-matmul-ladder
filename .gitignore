@@ -1,0 +1,19 @@
+# compiled programs
+build/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# generated, regenerable data (the small result CSVs and PNG charts ARE committed)
+*.trace
+
+# large profiler reports (the small .txt metric dumps are committed)
+*.ncu-rep
+*.nsys-rep
+*.sqlite
+
+# editor and OS files
+.vscode/
+.DS_Store
