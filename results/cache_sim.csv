@@ -1,0 +1,11 @@
+experiment,trace,ways,sets,accesses,hits,misses,hit_rate
+traversal,row,8,64,262144,245760,16384,93.75
+traversal,col,8,64,262144,0,262144,0.0
+traversal,blocked,8,64,262144,245760,16384,93.75
+associativity,col,1,512,262144,0,262144,0.0
+associativity,col,2,256,262144,0,262144,0.0
+associativity,col,4,128,262144,0,262144,0.0
+associativity,col,8,64,262144,0,262144,0.0
+associativity,col,16,32,262144,0,262144,0.0
+associativity,col,64,8,262144,0,262144,0.0
+associativity,col,512,1,262144,245760,16384,93.75
