@@ -1,0 +1,4 @@
+date: 2026-10-16 11:25
+gpu, driver: NVIDIA GeForce RTX 2060, 595.99.02
+nvcc: Build cuda_13.4.r13.4/compiler.38855100_0
+sizes: [256, 512, 1024, 2048, 4096]  repeats: 3  cooldown: 5.0s
