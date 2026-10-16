@@ -1,0 +1,21 @@
+==PROF== Connected to process 23955 (/home/vishnu-dholu/Code/cuda-matmul-ladder/build/matmul)
+==PROF== Profiling "matmul_tiled": 0%....50%....100% - 1 pass
+
+GPU: NVIDIA GeForce RTX 2060   N: 2048   reps: 1
+
+  Kernel           Time (ms)     GFLOPS     vs v1   % cuBLAS  Check  Share of cuBLAS
+  --------------------------------------------------------------------------------------
+  v3_tiled_t32        28.189      609.5         -      14.3%  PASS   ###
+  cublas               4.023     4270.5         -     100.0%  PASS   ####################
+
+==PROF== Disconnected from process 23955
+[23955] matmul@127.0.0.1
+  void matmul_tiled<32>(const float *, const float *, float *, int) (64, 64, 1)x(32, 32, 1), Context 1, Stream 7, Device 0, CC 7.5
+    Section: Command line profiler metrics
+    ----------------------------------------------------------- ----------- ------------
+    Metric Name                                                 Metric Unit Metric Value
+    ----------------------------------------------------------- ----------- ------------
+    sm__inst_executed_pipe_lsu.avg.pct_of_peak_sustained_active           %        72.68
+    sm__pipe_fma_cycles_active.avg.pct_of_peak_sustained_active           %        13.65
+    ----------------------------------------------------------- ----------- ------------
+
