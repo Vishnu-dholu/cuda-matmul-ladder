@@ -2,8 +2,8 @@
 """Make the README charts from results/summary.csv.
 
 Usage (from the project root):
-    python3 scripts/plot.py                           # uses device_info numbers
-    python3 scripts/plot.py --peak-gflops 6100        # if you measured a higher boost clock
+    python3 scripts/plot.py                           # 7546 GFLOPS peak (boost clock)
+    python3 scripts/plot.py --peak-gflops 6100        # another clock/GPU
 Outputs:
     results/gflops_vs_n.png   every kernel across all sizes
     results/ladder.png        the optimization ladder at one size
@@ -97,8 +97,8 @@ def roofline(df, kernels, n, peak, bw):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--peak-gflops", type=float, default=4608.0,
-                   help="FP32 peak: 2 x 1920 cores x clock (device_info gave 4608 at 1.2 GHz)")
+    p.add_argument("--peak-gflops", type=float, default=7546.0,
+                   help="FP32 peak: 2 x 1920 cores x boost clock (1.965 GHz seen in the clock log = 7546; device_info reports only 1.2 GHz)")
     p.add_argument("--peak-bw", type=float, default=264.0, help="DRAM bandwidth in GB/s (device_info)")
     p.add_argument("--n", type=int, default=2048, help="matrix size for the ladder and roofline charts")
     args = p.parse_args()

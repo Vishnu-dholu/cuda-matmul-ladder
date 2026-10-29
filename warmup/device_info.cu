@@ -34,7 +34,7 @@ int main() {
            attr(cudaDevAttrMaxRegistersPerMultiprocessor),
            attr(cudaDevAttrMaxThreadsPerMultiProcessor));
     printf(
-        "Theoretical FP32 peak: %.0f GFLOPS | bandwidth: %.0f GB/s | ridge point: %.1f FLOP/byte\n",
+        "FP32 peak at reported max clock: %.0f GFLOPS (boost clock is higher) | bandwidth: %.0f GB/s | ridge point: %.1f FLOP/byte\n",
         peakGflops, peakGBs, peakGflops / peakGBs);
     printf("Kernel time limit (display watchdog): %s\n",
            attr(cudaDevAttrKernelExecTimeout) ? "yes" : "no");

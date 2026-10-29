@@ -43,6 +43,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--sizes", type=int, nargs="+", default=[256, 512, 1024, 2048, 4096])
     p.add_argument("--repeats", type=int, default=3, help="independent runs per size (median is reported)")
+    p.add_argument("--min-reps", type=int, default=3, help="minimum timed launches per kernel (the harness also times >= 300 ms)")
     p.add_argument("--cooldown", type=float, default=5.0, help="seconds of rest between runs (laptop heat)")
     args = p.parse_args()
 
@@ -52,7 +53,7 @@ def main():
 
     raw = []
     for n in args.sizes:
-        reps = 3 if n >= 4096 else 10          # the naive kernel is slow at 4096
+        reps = 3                               # minimum launches; main.cu adds more for short kernels
         for r in range(1, args.repeats + 1):
             print(f"N={n:5d}  run {r}/{args.repeats}", flush=True)
             for row in run_once(n, reps):

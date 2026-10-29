@@ -1,10 +1,12 @@
 // main.cu: benchmark harness.
-// Usage: ./build/matmul N [reps] [--csv] [--only KERNEL]
+// Usage: ./build/matmul N [min_reps] [--csv] [--only KERNEL]
 //   default        : readable table in the terminal
 //   --csv          : machine-readable CSV on stdout (used by scripts/run_bench.py)
 //   --only KERNEL  : run just one kernel (plus cuBLAS), handy for profiling
 #include <unistd.h>
 
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
@@ -25,15 +27,36 @@ struct Result {
 };
 
 // Average time of one launch in milliseconds, measured with CUDA events.
-static float time_ms(const std::function<void()>& launch, int reps) {
+// Warm-up runs for at least WARMUP_MS so a laptop GPU can ramp its clock up from idle, then the
+// timed loop runs at least `min_reps` launches AND at least MIN_TIMED_MS, so short kernels (small N)
+// are not timed over a few microseconds.
+static float time_ms(const std::function<void()>& launch, int min_reps) {
+    constexpr double WARMUP_MS = 200.0, MIN_TIMED_MS = 300.0;
+    constexpr int MAX_REPS = 100000;
+    auto wall_ms = [](std::chrono::steady_clock::time_point t0) {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0)
+            .count();
+    };
+
+    auto t0 = std::chrono::steady_clock::now();
+    int warm = 0;
+    do {
+        launch();
+        CUDA_CHECK(cudaDeviceSynchronize());
+        ++warm;
+    } while (wall_ms(t0) < WARMUP_MS);
+    double est = wall_ms(t0) / warm;  // clock is warm now: estimated ms per launch
+    int reps = (int)(MIN_TIMED_MS / est) + 1;
+    if (reps < min_reps) reps = min_reps;
+    if (reps > MAX_REPS) reps = MAX_REPS;
+
     cudaEvent_t start, stop;
     CUDA_CHECK(cudaEventCreate(&start));
     CUDA_CHECK(cudaEventCreate(&stop));
-    launch();  // warm-up run
-    CUDA_CHECK(cudaDeviceSynchronize());
     CUDA_CHECK(cudaEventRecord(start));
     for (int r = 0; r < reps; ++r) launch();
     CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaGetLastError());
     CUDA_CHECK(cudaEventSynchronize(stop));
     float ms = 0.0f;
     CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
@@ -61,7 +84,7 @@ static void print_table(const std::vector<Result>& res, int N, int reps, const c
         if (r.name == "cublas") ceiling = r.gflops;
     }
 
-    printf("\n%sGPU:%s %s   %sN:%s %d   %sreps:%s %d\n\n", bold, reset, gpu, bold, reset, N, bold,
+    printf("\n%sGPU:%s %s   %sN:%s %d   %smin reps:%s %d\n\n", bold, reset, gpu, bold, reset, N, bold,
            reset, reps);
     printf("%s  %-14s %11s %10s %9s %10s  %-5s  %s%s\n", bold, "Kernel", "Time (ms)", "GFLOPS",
            "vs v1", "% cuBLAS", "Check", "Share of cuBLAS", reset);

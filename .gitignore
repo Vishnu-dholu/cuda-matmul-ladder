@@ -11,6 +11,7 @@ __pycache__/
 
 # large profiler reports (the small .txt metric dumps are committed)
 *.ncu-rep
+*.ncu-repz
 *.nsys-rep
 *.sqlite
 
